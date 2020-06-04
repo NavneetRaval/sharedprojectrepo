@@ -1,0 +1,246 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<style>
+    input.text-danger {
+        border-color: #a94442;
+    }
+
+    select.text-danger {
+        border-color: #a94442;
+    }
+</style>
+
+<div class="panel panel-primary">
+    <div class="panel-heading">Product List</div>
+    <div class="panel-body">
+        <div class="row">
+            <div class="col-md-5">
+                <input type="text" id="search" placeholder="Search ..." />
+            </div>
+            <div class="col-md-6">
+                <a id="btnNewProduct" href="Javascript:;" class="btn btn-primary" style="float: right; margin-bottom: 5px; ">New Product</a>
+            </div>
+        </div>
+        <table class="table table-bordered table-hover" id="tblProduct">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Price</th>
+                    <th>Quantity</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+
+</div>
+
+<div id="Product_model" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><b>Product Form</b></h5>
+
+            </div>
+            <div class="modal-body">
+                <div id="alertBox" class="custom-alerts alert alert-danger" style="display:none;">
+                    <button type="button" class="close" data-hide="alert" aria-hidden="true"></button>
+                    <span></span>
+                </div>
+                <br />
+                <div id="partial_body">
+
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button id="btnSave" type="button" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section scripts
+{
+    <script src="~/Scripts/jquery.validate.min.js"></script>
+
+    <script>
+
+        function GetProductForm(id) {
+                $.ajax({
+                    url: '@Url.Action("ProductFormPartialView", "Home")',
+                    type: 'GET',
+                    data: {id : id},
+                    success: function (response) {
+                        $("#Product_model .modal-body #partial_body").html(response);
+                        Init();
+                        $("#Product_model").modal({
+                            backdrop: 'static'
+                        });
+                    }
+                });
+            }
+
+        function SaveProductData(data) {
+                $.ajax({
+                    url: '@Url.Action("SaveProduct", "Home")',
+                    type: 'POST',
+                    data: data,
+                    success: function (response) {
+                        if (response.responseStatus) {
+                            alert(response.messages[0]);
+                            location.reload();
+                        } else {
+                            var d = document.createElement("ul");
+                            for (var i = 0; i < response.messages.length; i++) {
+                                $(d).css("margin-bottom", "0px").append($(document.createElement("li")).append(response.messages[i]));
+                            }
+                            $("#alertBox span").html(d.outerHTML);
+                            $("#alertBox").show();
+                            $(window).scrollTop($('#alertBox').position().top);
+                        }
+                    },
+                    error: function (XMLHttpRequest, textStatus, errorThrown) {
+                        if (XMLHttpRequest.status == 0) {
+                            alert(' Check Your Network.');
+                        } else if (XMLHttpRequest.status == 404) {
+                            alert('Requested URL not found.');
+                        } else if (XMLHttpRequest.status == 500) {
+                            alert('Internel Server Error.');
+                        } else {
+                            alert('Unknow Error.\n' + XMLHttpRequest.responseText);
+                        }
+                    }
+                })
+        }
+        function DeleteProductData(data) {
+
+               $.ajax({
+                    url: '@Url.Action("Delete", "Home")',
+                    type: 'GET',
+                   data: { id: data},
+                    success: function (response) {
+                        LoadData('');
+
+                    }
+                });
+            }
+        function LoadData(TextSearch) {
+            $.getJSON('@Url.Action("GetProductList", "Home")', { TextSearch: TextSearch },
+                function (json) {
+                    var tr;
+                    //Append each row to html table
+                    $('#tblProduct tbody').empty();
+                    var json = json.aaData;
+
+                    for (var i = 0; i < json.length; i++) {
+                        tr = $('<tr/>');
+                        tr.append("<td>" + json[i].ProductName + "</td>");
+                        tr.append("<td>" + json[i].Price + "</td>");
+                        tr.append("<td>" + json[i].Quantity + "</td>");
+                        var row_button = '<a data-val="' + json[i].ProductId +'" class="btn btn-primary btnEdit" href="Javascript:;" style="margin-right: 3px;">Edit</i></a>' +
+                            '<a class="btn btn-danger btnDelete" data-val="' + json[i].ProductId +'"  href="Javascript:;">Delete</i></a>';
+
+                        tr.append("<td>" + row_button + "</td>");
+                        $('table').append(tr);
+                    }
+                    if (json.length == 0) {
+                        tr = $('<tr/>');
+                        tr.append("<td colspan='4' style='color:red; font-size: 15px; font-weight:bold; text-align:center;' >" + "No record found." + "</td>");
+
+                        $('table').append(tr);
+                    }
+                });
+        }
+
+        function Init() {
+            $("#Price,#Quantity").keypress(function (e) {
+                if (String.fromCharCode(e.keyCode).match(/[^0-9]/g)) return false;
+            });
+            LoadData('');
+            $("#search").keyup(function () {
+                LoadData($(this).val());
+            });
+            $("#ProductForm").validate({
+                ignore: [],
+                errorElement: "span",
+                errorClass: "text-danger",
+                rules: {
+                    ProductName: { required: true, maxlength: 100 },
+                    Price: "required",
+                    Quantity: "required"
+                },
+                // Specify validation error messages
+                ProductName: {
+                    Name: {
+                        required: "Product name field is required.",
+                        maxlength: "Name field maximum length is 100 characters."
+                    },
+                    Price: "Price field is required.",
+                    Quantity: "Quantity field is required"
+
+                },
+                errorPlacement: function (error, element) {
+                    $(element).parent().append(error);
+                },
+                onkeyup: function (element, event) {
+                    if (event.which === 9 && this.elementValue(element) === "") {
+                        return;
+                    } else {
+                        this.element(element);
+                    }
+                },
+                onfocusout: function (element, event) {
+                    if (event.which === 9 && this.elementValue(element) === "") {
+                        return;
+                    } else {
+                        this.element(element);
+                    }
+                },
+                onchange: function (element, event) {
+                    if (event.which === 9 && this.elementValue(element) === "") {
+                        return;
+                    } else {
+                        this.element(element);
+                    }
+                }
+            });
+        }
+
+        $(document).ready(function () {
+            Init();
+
+
+            $("#btnNewProduct").click(function () {
+                GetProductForm(null);
+            })
+
+
+            $("#btnSave").click(function () {
+                var ProductForm = $("#ProductForm");
+                ProductForm.validate();
+                if (ProductForm.valid()) {
+                   SaveProductData(ProductForm.serializeArray());
+                }
+            });
+            $('#tblProduct tbody').on('click', 'tr td .btnDelete', function () {
+                if (confirm("Are you sure want to delete this data ?")) {
+                    var id = $(this).attr("data-val");
+                    DeleteProductData(id);
+                }
+                return false;
+            });
+
+            $('#tblProduct tbody').on('click', 'tr td .btnEdit', function () {
+                var id = $(this).attr("data-val");
+                GetProductForm(id);
+            });
+
+        });
+
+    </script>
+
+}
